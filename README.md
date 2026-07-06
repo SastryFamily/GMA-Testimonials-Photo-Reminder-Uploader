@@ -1,10 +1,63 @@
-# GMA Testimonial Photo Uploader
+# GMA Testimonial Plugins — Photo Reminder & Photo Uploader
 
-WordPress plugin for [Global Mentoring Academy](https://globalmentoringacademy.com) that lets logged-in members upload a photo to their own testimonial. It works alongside the **GMA Testimonial Photo Reminder** plugin, which emails members who submitted a testimonial but haven't yet added a photo — this plugin provides the upload page those reminder emails point to.
+This repo contains two companion WordPress plugins for [Global Mentoring Academy](https://globalmentoringacademy.com) that together close the "testimonial without a photo" gap:
 
-**Current version:** 1.0
+| Plugin | File | Version | Role |
+|---|---|---|---|
+| **GMA Testimonial Photo Reminder** | `gma-testimonial-reminder.php` | 5.10 | Emails members who submitted a testimonial but haven't uploaded a photo |
+| **GMA Testimonial Photo Uploader** | `gma-testimonial-photo-uploader.php` | 1.0 | The members-only upload page those reminder emails link to |
 
 ---
+
+# Plugin 1: GMA Testimonial Photo Reminder (v5.10)
+
+## Requirements
+
+### Business requirement
+- Testimonials without photos are less compelling on the public testimonials page.
+- Members who submitted a testimonial without a photo should be politely reminded by email to add one — automatically, on a schedule, without pestering anyone indefinitely.
+
+### Functional requirements
+1. Daily automated reminder emails at a configurable time (IST).
+2. Candidates = Strong Testimonials posts (`wpm-testimonial`) that have **no featured image** and **do have an email** meta value.
+3. **Max reminders per person** is configurable (default 2) and strictly enforced across auto and manual sends.
+4. Email subject and HTML body are editable in wp-admin, with `{first_name}`, `{name}`, `{email}` placeholders.
+5. Admin copies (Cc) go to GMA admins on every send.
+6. Manual "send now" and per-recipient test sends from the admin page.
+7. Full activity log (capped at 500 entries) with IST timestamps and per-recipient send count (e.g. `2/2`).
+8. Admin page shows last run, next scheduled run, and live cron status.
+
+### Technical requirements
+- WP-Cron based (single events, rescheduled after each run) — no server crontab needed.
+- All dates/times hardcoded to **Asia/Kolkata (IST)**, independent of WordPress/server timezone settings.
+- Reliable email delivery via WP Mail SMTP.
+
+## Solution
+
+Single class `GMA_TR` handles everything:
+
+1. **Scheduling** — `schedule_next()` computes the next run at the configured IST time (today if still ahead, otherwise tomorrow), clears any old event, and schedules a single `gma_tr_event`. The run handler always calls `schedule_next()` at the end, so the chain never breaks.
+2. **Self-healing cron (FIX 1)** — on every page load (`init`), `maybe_reschedule()` re-queues the event if it has vanished (plugin update, cron clear, hosting hiccup). The admin page shows a red "NOT SCHEDULED — will self-heal" warning if that state is ever observed.
+3. **Day guard (FIX 4)** — auto-runs are limited to once per IST calendar day via `gma_tr_last_sent_day`, and the guard still reschedules before exiting (FIX 2a).
+4. **Per-recipient enforcement (FIX 3)** — a persistent `gma_tr_send_counts` option maps email → count; recipients at/over the max are skipped in both auto and manual runs. A one-time migration (`migrate_counts()`) rebuilt counts from the pre-v5.9 log history.
+5. **Sending** — placeholders substituted into the HTML body; sent via `wp_mail()` from `support@globalmentoringacademy.com` with admin Cc's; every send appended to the capped log with IST timestamp and `n/max` count.
+6. **Lifecycle** — activation seeds default settings only if none exist (config survives re-activation); deactivation clears the scheduled hook.
+
+## Code map
+
+| Element | Purpose |
+|---|---|
+| `activate()` / `deactivate()` | Default settings on first activate; cron cleanup on deactivate |
+| `maybe_reschedule()` on `init` | Self-healing cron |
+| `migrate_counts()` | One-time send-count rebuild from legacy logs |
+| `schedule_next()` | IST-aware single-event scheduling |
+| `get_candidates()` | Testimonials with email but no featured image |
+| `run($manual)` | Day guard → per-recipient max check → send → log → count → reschedule |
+| `page()` | Settings form, cron status, manual send, activity log in wp-admin |
+
+---
+
+# Plugin 2: GMA Testimonial Photo Uploader (v1.0)
 
 ## Requirements
 
