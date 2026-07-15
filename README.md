@@ -5,7 +5,7 @@ This repo contains two companion WordPress plugins for [Global Mentoring Academy
 | Plugin | File | Version | Role |
 |---|---|---|---|
 | **GMA Testimonial Photo Reminder** | `gma-testimonial-reminder.php` | 5.10 | Emails members who submitted a testimonial but haven't uploaded a photo |
-| **GMA Testimonial Photo Uploader** | `gma-testimonial-photo-uploader.php` | 1.0 | The members-only upload page those reminder emails link to |
+| **GMA Testimonial Photo Uploader** | `gma-testimonial-photo-uploader.php` | 1.1 | The members-only upload page those reminder emails link to |
 
 ---
 
@@ -57,7 +57,7 @@ Single class `GMA_TR` handles everything:
 
 ---
 
-# Plugin 2: GMA Testimonial Photo Uploader (v1.0)
+# Plugin 2: GMA Testimonial Photo Uploader (v1.1)
 
 ## Requirements
 
@@ -125,6 +125,24 @@ Single-file plugin: `gma-testimonial-photo-uploader.php`
 2. Activate **GMA Testimonial Photo Uploader**.
 3. Create a page and add the shortcode `[gma_testimonial_photo_upload]`.
 4. Link to that page from the Photo Reminder emails.
+
+---
+
+## Changelog
+
+### v1.1 (2026-07-15)
+Hardening and diagnostics release, prompted by a member's unexplained upload failure:
+- **Real error messages** — `WP_Error` reasons from `media_handle_upload()` are shown to the member instead of a generic "Error uploading image".
+- **Oversized-POST detection** — if the upload exceeds PHP's `post_max_size`, the request arrives empty and v1.0 silently redisplayed the form; v1.1 detects this via `CONTENT_LENGTH` and tells the member the file is too large.
+- **PHP upload error handling** — friendly messages for ini/form size limits, interrupted uploads, and missing files.
+- **Explicit 5 MB size limit** — checked server-side and stated on the form.
+- **File type validation** — real content check via `wp_check_filetype_and_ext()`, limited to JPG/PNG/GIF/WebP, with a specific hint for iPhone HEIC photos (the most likely cause of the reported issue).
+- **CSRF nonce** — upload form is now nonce-protected.
+- **Old photo cleanup** — replacing a photo deletes the previous attachment, but only if it was uploaded via this plugin (tracked by `_gma_photo_upload` meta); other media is never touched.
+- Form now states accepted formats and size limit; the existing-photo notice mentions that a new upload replaces it.
+
+### v1.0
+Initial release: login-gated shortcode, email-based testimonial matching, featured image upload.
 
 ---
 
